@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWIG 🍺 — Host</title>
+  <link rel="stylesheet" href="/shared/style.css">
+  <style>
+    body { padding: 0; background: var(--color-bg); }
+
+    /* ── Layout ── */
+    #app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-family: var(--font-arcade);
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      background: linear-gradient(135deg, var(--color-neon-pink), var(--color-neon-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .round-badge {
+      font-family: var(--font-arcade);
+      font-size: 0.6rem;
+      color: var(--color-text-muted);
+    }
+
+    /* ── Views ── */
+    .view { display: none; animation: fadeIn 0.3s ease; }
+    .view.active { display: flex; flex-direction: column; flex: 1; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Lobby ── */
+    #lobby-view {
+      flex-direction: row;
+      gap: 32px;
+      align-items: flex-start;
+    }
+
+    .qr-panel {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .qr-panel img {
+      width: clamp(180px, 20vw, 260px);
+      height: auto;
+      border-radius: var(--radius);
+      border: 3px solid var(--color-border);
+    }
+
+    .qr-url {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .lobby-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .player-count {
+      font-family: var(--font-arcade);
+      font-size: 0.65rem;
+      color: var(--color-text-muted);
+    }
+
+    /* ── Generating ── */
+    #generating-view {
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      text-align: center;
+    }
+
+    .dots-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .dot-anim {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--color-neon-pink);
+      animation: bounce 0.6s infinite alternate;
+    }
+    .dot-anim:nth-child(2) { background: var(--color-neon-blue); animation-delay: 0.15s; }
+    .dot-anim:nth-child(3) { background: var(--color-neon-green); animation-delay: 0.3s; }
+
+    @keyframes bounce {
+      from { transform: translateY(0); }
+      to   { transform: translateY(-16px); }
+    }
+
+    /* ── Hot Seat callout ── */
+    #hotseat-callout-view {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 24px;
+    }
+
+    .callout-box {
+      background: linear-gradient(135deg, rgba(255,45,120,0.08), rgba(0,212,255,0.08));
+      border: 3px solid var(--color-neon-pink);
+      border-radius: var(--radius);
+      padding: 48px;
+      max-width: 700px;
+      box-shadow: var(--shadow-neon-pink);
+    }
+
+    .callout-name {
+      font-family: var(--font-arcade);
+      font-size: clamp(1.5rem, 4vw, 3rem);
+      color: var(--color-neon-pink);
+      text-shadow: 0 0 20px rgba(255,45,120,0.5);
+      line-height: 1.4;
+    }
+
+    .callout-expertise {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--color-neon-blue);
+      margin-top: 16px;
+    }
+
+    /* ── Hot Seat question ── */
+    #hotseat-question-view {
+      gap: 24px;
+    }
+
+    .question-text {
+      font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .question-category {
+      font-family: var(--font-arcade);
+      font-size: 0.55rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .waiting-msg {
+      font-weight: 600;
+      color: var(--color-text-muted);
+      font-style: italic;
+    }
+
+    /* ── Buzzer round ── */
+    #buzzer-view {
+      gap: 24px;
+    }
+
+    .buzzer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .buzzer-winner-banner {
+      background: var(--color-neon-blue);
+      color: white;
+      padding: 16px 32px;
+      border-radius: var(--radius);
+      font-family: var(--font-arcade);
+      font-size: clamp(0.7rem, 2vw, 1.2rem);
+      text-align: center;
+      box-shadow: var(--shadow-neon-blue);
+      animation: pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    /* ── Result banner ── */
+    .result-banner {
+      padding: 24px;
+      border-radius: var(--radius);
+      text-align: center;
+      font-family: var(--font-arcade);
+      font-size: clamp(0.7rem, 2vw, 1.2rem);
+      animation: pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .result-correct {
+      background: rgba(57,255,20,0.12);
+      border: 2px solid var(--color-neon-green);
+      color: #1a9900;
+    }
+
+    .result-wrong {
+      background: rgba(255,45,120,0.1);
+      border: 2px solid var(--color-neon-pink);
+      color: var(--color-neon-pink);
+    }
+
+    /* ── Pick drinker ── */
+    #pick-drinker-view {
+      gap: 24px;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* ── Results ── */
+    #results-view {
+      gap: 24px;
+      align-items: center;
+    }
+
+    .mvp-banner {
+      background: linear-gradient(135deg, rgba(255,229,0,0.15), rgba(255,45,120,0.1));
+      border: 2px solid var(--color-neon-yellow);
+      border-radius: var(--radius);
+      padding: 20px 40px;
+      text-align: center;
+    }
+
+    /* ── Scoreboard sidebar ── */
+    .scoreboard {
+      position: fixed;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .score-card {
+      background: var(--color-card);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: border-color 0.2s;
+    }
+
+    .score-card.active-player {
+      border-color: var(--color-neon-pink);
+      box-shadow: var(--shadow-neon-pink);
+    }
+
+    .score-drinks { color: var(--color-neon-pink); font-size: 0.8rem; }
+
+    /* ── Keyboard hint ── */
+    .key-hint {
+      position: fixed;
+      bottom: 20px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .key {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
+    .key kbd {
+      font-family: var(--font-arcade);
+      font-size: 0.5rem;
+      background: var(--color-border);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="logo">🎮 SWIG</div>
+    <span class="round-badge" id="round-badge"></span>
+    <div id="header-btns"></div>
+  </header>
+
+  <!-- ── LOBBY ──────────────────────────────────────────── -->
+  <div id="lobby-view" class="view active">
+    <div class="qr-panel">
+      <div class="card" style="padding:16px; text-align:center;">
+        <div class="arcade-label mb-sm">Scan to join</div>
+        <img id="qr-img" src="" alt="QR Code" style="display:none">
+        <div id="qr-loading" style="padding:60px 20px; color:var(--color-text-muted); font-size:0.85rem;">Loading QR…</div>
+      </div>
+      <div class="qr-url" id="qr-url"></div>
+    </div>
+
+    <div class="lobby-right">
+      <div class="card">
+        <div class="arcade-label mb-md">Players (<span id="player-count">0</span>)</div>
+        <div class="player-list" id="player-list-lobby">
+          <span style="color:var(--color-text-muted); font-size:0.85rem;">Waiting for players to join…</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary w-full" id="start-btn" style="font-size:0.9rem; padding:20px;">
+        ▶ START GAME
+      </button>
+      <div class="arcade-label text-center" style="color:var(--color-text-muted);">or press ENTER</div>
+    </div>
+  </div>
+
+  <!-- ── GENERATING ────────────────────────────────────── -->
+  <div id="generating-view" class="view">
+    <div class="dots-row">
+      <div class="dot-anim"></div>
+      <div class="dot-anim"></div>
+      <div class="dot-anim"></div>
+    </div>
+    <div class="arcade-title">GENERATING<br>QUESTIONS…</div>
+    <div style="color:var(--color-text-muted); font-weight:600;">Claude AI is crafting personalised expert questions…</div>
+  </div>
+
+  <!-- ── HOT SEAT CALLOUT ───────────────────────────────── -->
+  <div id="hotseat-callout-view" class="view">
+    <div class="callout-box">
+      <div class="arcade-label badge-pink neon-badge mb-md">🔥 HOT SEAT</div>
+      <div class="callout-name" id="callout-name">PLAYER NAME</div>
+      <div class="callout-expertise" id="callout-expertise"></div>
+      <div class="mt-lg" style="color:var(--color-text-muted); font-weight:600; font-size:1rem;">
+        You have declared yourself an expert.<br>Now prove it.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOT SEAT QUESTION ──────────────────────────────── -->
+  <div id="hotseat-question-view" class="view">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span class="neon-badge badge-pink">🔥 HOT SEAT</span>
+      <span id="hs-player-chip" style="font-weight:700;"></span>
+    </div>
+
+    <div class="card">
+      <div class="question-text" id="hs-question-text"></div>
+    </div>
+
+    <div class="choices" id="hs-choices"></div>
+
+    <div class="waiting-msg" id="hs-waiting">Waiting for <span id="hs-answering-name"></span> to answer on their phone…</div>
+
+    <div id="hs-result" class="hidden"></div>
+  </div>
+
+  <!-- ── PICK DRINKER ───────────────────────────────────── -->
+  <div id="pick-drinker-view" class="view">
+    <div class="neon-badge badge-green" style="font-size:0.65rem; padding:10px 24px;">✅ CORRECT!</div>
+    <div class="arcade-title mt-md" id="pd-player-name"></div>
+    <div style="font-size:1.1rem; font-weight:600; color:var(--color-text-muted);" class="mt-sm">
+      is choosing who drinks…
+    </div>
+    <div id="pd-result" class="hidden mt-lg"></div>
+  </div>
+
+  <!-- ── BUZZER ROUND ───────────────────────────────────── -->
+  <div id="buzzer-view" class="view">
+    <div class="buzzer-top">
+      <span class="neon-badge badge-blue">⚡ BUZZER ROUND</span>
+      <span id="bz-category" class="arcade-label"></span>
+      <button class="btn btn-blue" id="open-buzzer-btn">OPEN BUZZER</button>
+    </div>
+
+    <div class="card">
+      <div class="question-text" id="bz-question-text"></div>
+    </div>
+
+    <div class="choices" id="bz-choices"></div>
+
+    <div id="bz-winner-area"></div>
+    <div id="bz-result" class="hidden"></div>
+  </div>
+
+  <!-- ── RESULTS ────────────────────────────────────────── -->
+  <div id="results-view" class="view">
+    <div class="arcade-title">GAME OVER!</div>
+    <div class="mvp-banner" id="mvp-banner"></div>
+    <table class="leaderboard" id="leaderboard-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Expertise</th>
+          <th>Score</th>
+          <th>Drinks</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+    <button class="btn btn-primary mt-lg" id="restart-btn">↺ PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- ── Live scoreboard sidebar ── -->
+<div class="scoreboard" id="scoreboard" style="display:none"></div>
+
+<!-- ── Keyboard hints ── -->
+<div class="key-hint">
+  <div class="key"><kbd>ENTER</kbd> Start game</div>
+  <div class="key"><kbd>SPACE</kbd> Open buzzer</div>
+  <div class="key"><kbd>→</kbd> Next question</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let currentView = 'lobby';
+  let players = {};
+  let currentRound = {};
+  let hotSeatCalloutTimeout = null;
+
+  // ── View switching ───────────────────────────────────────────────────────
+  function showView(name) {
+    currentView = name;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const el = document.getElementById(name + '-view');
+    if (el) el.classList.add('active');
+
+    // Show scoreboard during gameplay
+    const gameViews = ['hotseat-callout','hotseat-question','pick-drinker','buzzer'];
+    document.getElementById('scoreboard').style.display =
+      gameViews.includes(name) ? 'flex' : 'none';
+  }
+
+  // ── QR Code ──────────────────────────────────────────────────────────────
+  async function loadQR() {
+    try {
+      const res = await fetch('/qr');
+      const data = await res.json();
+      const img = document.getElementById('qr-img');
+      img.src = data.qrDataUrl;
+      img.style.display = 'block';
+      document.getElementById('qr-loading').style.display = 'none';
+      document.getElementById('qr-url').textContent = data.url;
+    } catch (e) {
+      document.getElementById('qr-loading').textContent = 'QR unavailable';
+    }
+  }
+  loadQR();
+
+  // ── Register as host ─────────────────────────────────────────────────────
+  socket.emit('join_as_host');
+
+  // ── Players ─────────────────────────────────────────────────────────────
+  function renderPlayers(playerList) {
+    players = {};
+    playerList.forEach(p => players[p.id] = p);
+
+    // Lobby list
+    const lobby = document.getElementById('player-list-lobby');
+    document.getElementById('player-count').textContent = playerList.filter(p => p.connected).length;
+
+    if (playerList.length === 0) {
+      lobby.innerHTML = '<span style="color:var(--color-text-muted); font-size:0.85rem;">Waiting for players to join…</span>';
+    } else {
+      lobby.innerHTML = playerList
+        .filter(p => p.connected)
+        .map(p => `
+          <div class="player-chip">
+            <div class="dot"></div>
+            <span>${escHtml(p.name)}</span>
+            <span style="font-size:0.75rem; color:var(--color-text-muted);">${escHtml(p.expertise)}</span>
+          </div>`).join('');
+    }
+
+    renderScoreboard(playerList);
+  }
+
+  function renderScoreboard(playerList) {
+    const sb = document.getElementById('scoreboard');
+    if (playerList.length === 0) { sb.innerHTML = ''; return; }
+    sb.innerHTML = [...playerList]
+      .filter(p => p.connected)
+      .sort((a, b) => b.score - a.score)
+      .map(p => `
+        <div class="score-card" id="sc-${p.id}">
+          <span>${escHtml(p.name)}</span>
+          <div style="text-align:right;">
+            <div style="font-size:0.9rem;">${p.score}pts</div>
+            <div class="score-drinks">🍺 ${p.drinks}</div>
+          </div>
+        </div>`).join('');
+  }
+
+  // ── Socket events ────────────────────────────────────────────────────────
+
+  socket.on('player_list_update', ({ players: list }) => renderPlayers(list));
+
+  socket.on('game_generating', () => showView('generating'));
+
+  socket.on('game_started', () => {
+    // Views handled by hot_seat_round / buzzer_round events
+  });
+
+  // Hot seat callout (3-second dramatic hold)
+  socket.on('hot_seat_round', ({ hotSeatPlayerName, hotSeatExpertise, hotSeatPlayerId, question }) => {
+    document.getElementById('round-badge').textContent = '';
+    currentRound = { type: 'hot_seat', hotSeatPlayerId, hotSeatPlayerName, hotSeatExpertise, question };
+
+    document.getElementById('callout-name').textContent = hotSeatPlayerName.toUpperCase();
+    document.getElementById('callout-expertise').textContent = `EXPERT IN: ${hotSeatExpertise.toUpperCase()}`;
+
+    // Highlight on scoreboard
+    document.querySelectorAll('.score-card').forEach(c => c.classList.remove('active-player'));
+    const sc = document.getElementById('sc-' + hotSeatPlayerId);
+    if (sc) sc.classList.add('active-player');
+
+    showView('hotseat-callout');
+
+    clearTimeout(hotSeatCalloutTimeout);
+    hotSeatCalloutTimeout = setTimeout(() => {
+      showHotSeatQuestion(hotSeatPlayerName, hotSeatExpertise, question);
+    }, 3000);
+  });
+
+  function showHotSeatQuestion(name, expertise, question) {
+    document.getElementById('hs-player-chip').textContent = `${name} — ${expertise}`;
+    document.getElementById('hs-question-text').textContent = question.question;
+    document.getElementById('hs-answering-name').textContent = name;
+    document.getElementById('hs-waiting').classList.remove('hidden');
+    document.getElementById('hs-result').classList.add('hidden');
+
+    const choicesEl = document.getElementById('hs-choices');
+    choicesEl.innerHTML = question.choices.map((c, i) =>
+      `<button class="choice-btn" disabled>${c}</button>`
+    ).join('');
+
+    showView('hotseat-question');
+  }
+
+  socket.on('hot_seat_result', ({ correct, correctIndex, chosenIndex, playerName, pickingDrinker, players: list }) => {
+    renderPlayers(list);
+    document.getElementById('hs-waiting').classList.add('hidden');
+
+    // Highlight correct/wrong choices
+    const btns = document.querySelectorAll('#hs-choices .choice-btn');
+    btns.forEach((btn, i) => {
+      if (i === correctIndex) btn.classList.add('correct');
+      else if (!correct && i === chosenIndex) btn.classList.add('wrong');
+    });
+
+    const resultEl = document.getElementById('hs-result');
+    resultEl.classList.remove('hidden');
+
+    if (correct) {
+      resultEl.innerHTML = `<div class="result-banner result-correct">✅ ${escHtml(playerName)} GOT IT RIGHT! +2 points</div>`;
+
+      if (pickingDrinker) {
+        setTimeout(() => {
+          document.getElementById('pd-player-name').textContent = playerName.toUpperCase();
+          document.getElementById('pd-result').classList.add('hidden');
+          showView('pick-drinker');
+        }, 1800);
+      }
+    } else {
+      resultEl.innerHTML = `<div class="result-banner result-wrong">❌ ${escHtml(playerName)} IS WRONG — SWIG 🍺</div>`;
+    }
+  });
+
+  socket.on('drinker_picked', ({ pickerName, targetName, players: list }) => {
+    renderPlayers(list);
+    const res = document.getElementById('pd-result');
+    res.classList.remove('hidden');
+    res.innerHTML = `<div class="result-banner result-correct" style="background:rgba(0,212,255,0.1); border-color:var(--color-neon-blue); color:var(--color-neon-blue);">
+      🍺 ${escHtml(pickerName)} picks ${escHtml(targetName)} — DRINK!
+    </div>`;
+  });
+
+  socket.on('buzzer_round', ({ question }) => {
+    currentRound = { type: 'buzzer', question };
+    document.getElementById('bz-question-text').textContent = question.question;
+    document.getElementById('bz-category').textContent = question.category || '';
+    document.getElementById('bz-winner-area').innerHTML = '';
+    document.getElementById('bz-result').classList.add('hidden');
+    document.getElementById('open-buzzer-btn').disabled = false;
+    document.getElementById('open-buzzer-btn').textContent = 'OPEN BUZZER';
+
+    const choicesEl = document.getElementById('bz-choices');
+    choicesEl.innerHTML = question.choices.map((c, i) =>
+      `<button class="choice-btn" disabled>${c}</button>`
+    ).join('');
+
+    showView('buzzer');
+  });
+
+  socket.on('buzzer_open', () => {
+    document.getElementById('open-buzzer-btn').disabled = true;
+    document.getElementById('open-buzzer-btn').textContent = '⚡ BUZZER OPEN';
+  });
+
+  socket.on('buzzer_locked', ({ winnerName }) => {
+    document.getElementById('bz-winner-area').innerHTML =
+      `<div class="buzzer-winner-banner">⚡ ${escHtml(winnerName)} BUZZED IN!</div>`;
+  });
+
+  socket.on('trivia_answer_result', ({ correct, correctIndex, chosenIndex, playerName, players: list }) => {
+    renderPlayers(list);
+
+    const btns = document.querySelectorAll('#bz-choices .choice-btn');
+    btns.forEach((btn, i) => {
+      if (i === correctIndex) btn.classList.add('correct');
+      else if (!correct && i === chosenIndex) btn.classList.add('wrong');
+    });
+
+    const resultEl = document.getElementById('bz-result');
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = correct
+      ? `<div class="result-banner result-correct">✅ ${escHtml(playerName)} is RIGHT! +3 points</div>`
+      : `<div class="result-banner result-wrong">❌ ${escHtml(playerName)} is WRONG — SWIG 🍺</div>`;
+  });
+
+  socket.on('game_over', ({ leaderboard }) => {
+    const tbody = document.getElementById('leaderboard-body');
+    tbody.innerHTML = leaderboard.map(p => `
+      <tr class="rank-${p.rank}">
+        <td>${p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : p.rank}</td>
+        <td><strong>${escHtml(p.name)}</strong></td>
+        <td style="color:var(--color-text-muted); font-size:0.85rem;">${escHtml(p.expertise)}</td>
+        <td><strong>${p.score}</strong></td>
+        <td>🍺 ${p.drinks}</td>
+      </tr>`).join('');
+
+    if (leaderboard.length > 0) {
+      const mvp = leaderboard[0];
+      const bigDrinker = [...leaderboard].sort((a, b) => b.drinks - a.drinks)[0];
+      document.getElementById('mvp-banner').innerHTML = `
+        <div style="font-family:var(--font-arcade); font-size:0.7rem; color:var(--color-neon-yellow);">🏆 MVP: ${escHtml(mvp.name)} (${mvp.score} pts)</div>
+        ${bigDrinker.drinks > 0 ? `<div style="margin-top:8px; font-size:0.85rem; color:var(--color-text-muted);">Most drinks: ${escHtml(bigDrinker.name)} 🍺 ${bigDrinker.drinks}</div>` : ''}
+      `;
+    }
+
+    showView('results');
+  });
+
+  socket.on('game_reset', () => {
+    players = {};
+    renderPlayers([]);
+    showView('lobby');
+    loadQR();
+  });
+
+  socket.on('error_msg', (msg) => {
+    alert('Error: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
+  });
+
+  // ── Buttons ──────────────────────────────────────────────────────────────
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    socket.emit('host_start_game');
+  });
+
+  document.getElementById('open-buzzer-btn').addEventListener('click', () => {
+    socket.emit('host_open_buzzer');
+  });
+
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    socket.emit('host_restart');
+  });
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+
+    if (e.key === 'Enter' && currentView === 'lobby') {
+      socket.emit('host_start_game');
+    }
+    if (e.key === ' ' && currentView === 'buzzer') {
+      e.preventDefault();
+      socket.emit('host_open_buzzer');
+    }
+    if (e.key === 'ArrowRight' && ['hotseat-question','pick-drinker','buzzer'].includes(currentView)) {
+      socket.emit('host_next_question');
+    }
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

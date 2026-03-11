@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>SWIG 🍺</title>
+  <link rel="stylesheet" href="/shared/style.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      background: var(--color-bg);
+    }
+
+    #app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ── Views ── */
+    .view { display: none; flex-direction: column; flex: 1; animation: fadeIn 0.25s ease; }
+    .view.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Join form ── */
+    #join-view {
+      justify-content: center;
+      gap: 20px;
+      padding-bottom: 40px;
+    }
+
+    .logo-sm {
+      font-family: var(--font-arcade);
+      font-size: 1rem;
+      background: linear-gradient(135deg, var(--color-neon-pink), var(--color-neon-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-family: var(--font-arcade);
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text);
+      background: var(--color-card);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-group input:focus {
+      border-color: var(--color-neon-blue);
+    }
+
+    /* ── Lobby waiting ── */
+    #waiting-view {
+      gap: 20px;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .confirmed-badge {
+      background: rgba(57,255,20,0.12);
+      border: 2px solid var(--color-neon-green);
+      border-radius: var(--radius);
+      padding: 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .confirmed-name {
+      font-family: var(--font-arcade);
+      font-size: 1rem;
+      color: var(--color-text);
+    }
+
+    .confirmed-expertise {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    /* ── Hot seat (it's you) ── */
+    #hotseat-me-view {
+      gap: 16px;
+    }
+
+    .hotseat-header {
+      background: linear-gradient(135deg, var(--color-neon-pink), #ff6b9d);
+      color: white;
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .hotseat-header .big-text {
+      font-family: var(--font-arcade);
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .question-card {
+      background: var(--color-card);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    /* Phone-sized choice buttons */
+    .choices-phone {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .choice-btn-phone {
+      width: 100%;
+      padding: 18px;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-card);
+      color: var(--color-text);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .choice-btn-phone:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .choice-btn-phone:hover:not(:disabled) {
+      border-color: var(--color-neon-blue);
+      box-shadow: var(--shadow-neon-blue);
+    }
+
+    .choice-btn-phone.correct {
+      background: var(--color-neon-green);
+      border-color: var(--color-neon-green);
+    }
+
+    .choice-btn-phone.wrong {
+      background: var(--color-neon-pink);
+      border-color: var(--color-neon-pink);
+      color: white;
+    }
+
+    .choice-btn-phone.selected {
+      border-color: var(--color-neon-blue);
+      box-shadow: var(--shadow-neon-blue);
+      background: rgba(0, 212, 255, 0.12);
+    }
+
+    .choice-btn-phone:disabled { cursor: default; }
+
+    /* ── Pick drinker ── */
+    #pick-drinker-view {
+      gap: 16px;
+      align-items: center;
+    }
+
+    .pick-header {
+      background: rgba(0,212,255,0.1);
+      border: 2px solid var(--color-neon-blue);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      text-align: center;
+      font-family: var(--font-arcade);
+      font-size: 0.65rem;
+      color: var(--color-neon-blue);
+      line-height: 1.6;
+    }
+
+    .player-pick-btn {
+      width: 100%;
+      padding: 18px;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-card);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .player-pick-btn:active { transform: scale(0.97); }
+    .player-pick-btn:hover {
+      border-color: var(--color-neon-pink);
+      box-shadow: var(--shadow-neon-pink);
+    }
+
+    /* ── Spectator ── */
+    #spectator-view {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .spectator-box {
+      background: linear-gradient(135deg, rgba(255,45,120,0.06), rgba(0,212,255,0.06));
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      width: 100%;
+    }
+
+    /* ── Buzzer ── */
+    #buzzer-view {
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      text-align: center;
+    }
+
+    .buzzer-btn {
+      width: 80vw;
+      height: 80vw;
+      max-width: 320px;
+      max-height: 320px;
+      border-radius: 50%;
+      background: var(--color-neon-pink);
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-arcade);
+      font-size: clamp(0.8rem, 3.5vw, 1.1rem);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-neon-pink), 0 0 60px rgba(255,45,120,0.3);
+      animation: pulse-ring 2s infinite;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1.6;
+    }
+
+    .buzzer-btn:active { transform: scale(0.93); }
+    .buzzer-btn:disabled {
+      background: #ccc;
+      box-shadow: none;
+      animation: none;
+      cursor: not-allowed;
+    }
+
+    .buzzer-btn .buzzer-icon { font-size: 2.5rem; }
+
+    .buzzer-locked-msg {
+      font-family: var(--font-arcade);
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+      line-height: 1.8;
+    }
+
+    /* ── Trivia watching ── */
+    #trivia-watching-view {
+      gap: 16px;
+    }
+
+    /* ── Trivia answering ── */
+    #trivia-answer-view {
+      gap: 16px;
+    }
+
+    .answering-header {
+      background: linear-gradient(135deg, var(--color-neon-blue), #0099cc);
+      color: white;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      text-align: center;
+      font-family: var(--font-arcade);
+      font-size: 0.65rem;
+      line-height: 1.8;
+    }
+
+    /* ── Results ── */
+    #results-view {
+      gap: 16px;
+      align-items: center;
+    }
+
+    .my-score-card {
+      width: 100%;
+      background: linear-gradient(135deg, rgba(255,45,120,0.08), rgba(0,212,255,0.08));
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+    }
+
+    .my-score-number {
+      font-family: var(--font-arcade);
+      font-size: 2rem;
+      color: var(--color-neon-pink);
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      padding: 10px 20px;
+      background: var(--color-card);
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      text-align: center;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--color-text);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: transform 0.3s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ── JOIN FORM ───────────────────────────────────── -->
+  <div id="join-view" class="view active">
+    <div class="logo-sm">🎮 SWIG</div>
+    <div style="text-align:center; color:var(--color-text-muted); font-weight:600; font-size:0.9rem;">
+      Enter your name and your claimed area of expertise. Choose wisely — you'll be quizzed on it.
+    </div>
+
+    <div class="card" style="display:flex; flex-direction:column; gap:16px;">
+      <div class="form-group">
+        <label>Your name</label>
+        <input type="text" id="name-input" placeholder="e.g. Alex" maxlength="20" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Your declared expertise</label>
+        <input type="text" id="expertise-input" placeholder="e.g. 90s hip-hop, Spanish cuisine…" maxlength="40" autocomplete="off">
+      </div>
+    </div>
+
+    <button class="btn btn-primary w-full" id="join-btn" style="padding:18px; font-size:0.75rem;">
+      JOIN GAME →
+    </button>
+
+    <div id="join-error" style="color:var(--color-neon-pink); font-weight:700; text-align:center; display:none;"></div>
+  </div>
+
+  <!-- ── WAITING IN LOBBY ──────────────────────────────── -->
+  <div id="waiting-view" class="view">
+    <div class="logo-sm">🎮 SWIG</div>
+    <div class="confirmed-badge">
+      <div style="color: #1a9900; font-size:1.5rem;">✅</div>
+      <div class="confirmed-name" id="confirmed-name"></div>
+      <div class="confirmed-expertise" id="confirmed-expertise"></div>
+    </div>
+    <div style="color:var(--color-text-muted); font-weight:600; font-size:0.9rem;">
+      Waiting for the host to start the game…
+    </div>
+    <div class="card" style="width:100%">
+      <div class="arcade-label mb-md">Players in lobby</div>
+      <div class="player-list" id="player-list-waiting"></div>
+    </div>
+  </div>
+
+  <!-- ── GENERATING ─────────────────────────────────────── -->
+  <div id="generating-view" class="view" style="align-items:center; justify-content:center; gap:16px; text-align:center;">
+    <div class="logo-sm">🎮 SWIG</div>
+    <div style="font-family:var(--font-arcade); font-size:0.65rem; color:var(--color-text-muted); line-height:1.8;">
+      AI IS CRAFTING<br>YOUR EXPERT QUESTIONS…<br><span class="blink">▋</span>
+    </div>
+  </div>
+
+  <!-- ── HOT SEAT — IT'S YOU ────────────────────────────── -->
+  <div id="hotseat-me-view" class="view">
+    <div class="hotseat-header">
+      <div class="big-text">🔥 STAND UP!</div>
+      <div style="margin-top:8px; font-size:0.9rem;">You're on the hot seat.<br>Answer on your phone.</div>
+    </div>
+
+    <div class="question-card" id="hm-question"></div>
+
+    <div class="choices-phone" id="hm-choices"></div>
+
+    <div id="hm-result" class="hidden" style="text-align:center; font-weight:700; font-size:1rem; padding:16px;"></div>
+  </div>
+
+  <!-- ── HOT SEAT — PICK DRINKER ─────────────────────────── -->
+  <div id="pick-drinker-view" class="view">
+    <div class="pick-header">
+      🎯 YOU GOT IT RIGHT!<br>CHOOSE WHO DRINKS
+    </div>
+    <div class="choices-phone" id="pd-player-btns" style="width:100%;"></div>
+    <div id="pd-result" class="hidden" style="text-align:center; font-weight:700; color:var(--color-neon-blue); padding:16px; font-size:1rem;"></div>
+  </div>
+
+  <!-- ── HOT SEAT — SPECTATOR ───────────────────────────── -->
+  <div id="spectator-view" class="view">
+    <div class="spectator-box">
+      <div class="arcade-label mb-sm">🔥 HOT SEAT</div>
+      <div style="font-family:var(--font-arcade); font-size:1rem; color:var(--color-neon-pink); margin:12px 0;" id="sp-name"></div>
+      <div style="font-weight:700; color:var(--color-text-muted);" id="sp-expertise"></div>
+      <div style="margin-top:16px; font-size:0.85rem; color:var(--color-text-muted);">is answering their expert question…</div>
+    </div>
+  </div>
+
+  <!-- ── BUZZER ─────────────────────────────────────────── -->
+  <div id="buzzer-view" class="view">
+    <div class="neon-badge badge-blue" style="align-self:center;">⚡ BUZZER ROUND</div>
+    <div style="text-align:center; color:var(--color-text-muted); font-weight:700; font-size:0.85rem;" id="bz-status">
+      Waiting for host to open buzzer…
+    </div>
+    <div style="display:flex; justify-content:center; flex:1; align-items:center;">
+      <button class="buzzer-btn" id="buzz-btn" disabled>
+        <div class="buzzer-icon">⚡</div>
+        <div>BUZZ IN!</div>
+      </button>
+    </div>
+    <div id="bz-locked-msg" class="hidden" style="text-align:center;"></div>
+  </div>
+
+  <!-- ── TRIVIA — ANSWERING ─────────────────────────────── -->
+  <div id="trivia-answer-view" class="view">
+    <div class="answering-header">
+      ⚡ YOU BUZZED IN!<br>ANSWER FAST!
+    </div>
+    <div class="question-card" id="ta-question"></div>
+    <div class="choices-phone" id="ta-choices"></div>
+    <button id="ta-submit-btn" class="btn btn-primary w-full" onclick="submitTriviaAnswer()" disabled style="margin-top:8px; padding:18px; font-size:0.75rem;">SUBMIT ANSWER</button>
+    <div id="ta-result" class="hidden" style="text-align:center; font-weight:700; padding:16px; font-size:1rem;"></div>
+  </div>
+
+  <!-- ── TRIVIA — WATCHING ──────────────────────────────── -->
+  <div id="trivia-watching-view" class="view">
+    <div class="neon-badge badge-blue" style="align-self:center;">⚡ BUZZER ROUND</div>
+    <div class="question-card" id="tw-question"></div>
+    <div class="choices-phone" id="tw-choices" style="opacity:0.5; pointer-events:none;"></div>
+    <div id="tw-winner" class="hidden" style="text-align:center; font-weight:700; color:var(--color-neon-pink); padding:12px; font-family:var(--font-arcade); font-size:0.65rem;"></div>
+    <div id="tw-result" class="hidden" style="text-align:center; font-weight:700; padding:16px; font-size:1rem;"></div>
+  </div>
+
+  <!-- ── RESULTS ─────────────────────────────────────────── -->
+  <div id="results-view" class="view">
+    <div class="logo-sm">🎮 GAME OVER!</div>
+    <div class="my-score-card">
+      <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-muted); margin-bottom:8px;">Your score</div>
+      <div class="my-score-number" id="my-final-score">0</div>
+      <div style="margin-top:4px; font-size:0.85rem; color:var(--color-text-muted);">pts</div>
+      <div style="margin-top:8px; font-size:0.9rem; font-weight:700;">🍺 <span id="my-final-drinks">0</span> drink(s)</div>
+    </div>
+    <table class="leaderboard" id="results-leaderboard" style="width:100%">
+      <thead>
+        <tr><th>#</th><th>Name</th><th>Score</th><th>Drinks</th></tr>
+      </thead>
+      <tbody id="results-tbody"></tbody>
+    </table>
+    <div style="text-align:center; color:var(--color-text-muted); font-size:0.85rem; font-weight:600;">
+      Waiting for host to restart…
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Beer popup overlay -->
+<div id="beer-popup" style="
+  display:none;
+  position:fixed; inset:0; z-index:1000;
+  background:rgba(255,45,120,0.92);
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  text-align:center;
+  animation:fadeIn 0.2s ease;
+">
+  <div style="font-size:6rem; line-height:1; animation:bounce-big 0.5s infinite alternate;">🍺</div>
+  <div style="font-family:var(--font-arcade); font-size:1.2rem; color:white; line-height:1.8;">OH NO!</div>
+  <div id="beer-from-msg" style="color:rgba(255,255,255,0.85); font-weight:700; font-size:1rem;"></div>
+  <div style="color:rgba(255,255,255,0.7); font-size:0.85rem; font-weight:600;">TAP TO DISMISS</div>
+</div>
+
+<style>
+@keyframes bounce-big {
+  from { transform: translateY(0) rotate(-5deg); }
+  to   { transform: translateY(-16px) rotate(5deg); }
+}
+</style>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let myId = socket.id;
+  let myName = '';
+  let myExpertise = '';
+  let joined = false;
+  let currentTriviaQuestion = null;
+  let myExpertQuestions = [];
+
+  // ── View ──────────────────────────────────────────────────────────────────
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const el = document.getElementById(name + '-view');
+    if (el) el.classList.add('active');
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  let toastTimer;
+  function toast(msg, duration = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  // ── Join ──────────────────────────────────────────────────────────────────
+  document.getElementById('join-btn').addEventListener('click', joinGame);
+  document.getElementById('expertise-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinGame();
+  });
+
+  function joinGame() {
+    const name = document.getElementById('name-input').value.trim();
+    const expertise = document.getElementById('expertise-input').value.trim();
+    const errEl = document.getElementById('join-error');
+
+    if (!name) { errEl.textContent = 'Please enter your name.'; errEl.style.display='block'; return; }
+    if (!expertise) { errEl.textContent = 'Please enter your expertise.'; errEl.style.display='block'; return; }
+
+    errEl.style.display = 'none';
+    myName = name;
+    myExpertise = expertise;
+    socket.emit('join_as_player', { name, expertise });
+  }
+
+  // ── Socket events ─────────────────────────────────────────────────────────
+
+  socket.on('joined_game', ({ player }) => {
+    joined = true;
+    myId = player.id;
+    document.getElementById('confirmed-name').textContent = player.name;
+    document.getElementById('confirmed-expertise').textContent = `Expert in: ${player.expertise}`;
+    showView('waiting');
+    toast('You\'re in! 🎮');
+  });
+
+  socket.on('player_list_update', ({ players }) => {
+    const list = document.getElementById('player-list-waiting');
+    if (!list) return;
+    const connected = players.filter(p => p.connected);
+    list.innerHTML = connected.length === 0
+      ? '<span style="color:var(--color-text-muted); font-size:0.85rem;">Just you so far…</span>'
+      : connected.map(p => `
+          <div class="player-chip">
+            <div class="dot"></div>
+            <span>${escHtml(p.name)}</span>
+          </div>`).join('');
+
+    // Update results if on results screen
+    const tbody = document.getElementById('results-tbody');
+    if (tbody && tbody.childElementCount > 0) {
+      // Already showing results, skip
+    }
+  });
+
+  socket.on('game_generating', () => {
+    if (joined) showView('generating');
+  });
+
+  socket.on('your_expert_questions', ({ questions }) => {
+    myExpertQuestions = questions;
+  });
+
+  socket.on('game_started', () => {
+    // Views managed by subsequent round events
+  });
+
+  // Hot seat events
+  socket.on('your_turn_hot_seat', ({ question }) => {
+    document.getElementById('hm-question').textContent = question.question;
+    document.getElementById('hm-result').classList.add('hidden');
+
+    const choices = document.getElementById('hm-choices');
+    choices.innerHTML = question.choices.map((c, i) =>
+      `<button class="choice-btn-phone" onclick="submitExpertAnswer(${i})">${c}</button>`
+    ).join('');
+
+    showView('hotseat-me');
+  });
+
+  socket.on('spectator_hot_seat', ({ hotSeatPlayerName, hotSeatExpertise }) => {
+    document.getElementById('sp-name').textContent = hotSeatPlayerName.toUpperCase();
+    document.getElementById('sp-expertise').textContent = `Expert in: ${hotSeatExpertise}`;
+    showView('spectator');
+  });
+
+  socket.on('hot_seat_result', ({ correct, correctIndex, pickingDrinker, players: list }) => {
+    // If I was the hot seat player and this view is active
+    const hm = document.getElementById('hotseat-me-view');
+    if (hm.classList.contains('active')) {
+      const btns = document.querySelectorAll('#hm-choices .choice-btn-phone');
+      btns.forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === correctIndex) btn.classList.add('correct');
+        else if (i === myExpertChoiceIndex) btn.classList.add('wrong');
+      });
+      const res = document.getElementById('hm-result');
+      res.classList.remove('hidden');
+      res.style.color = correct ? '#1a9900' : 'var(--color-neon-pink)';
+      res.textContent = correct ? '✅ Correct! Choose who drinks…' : '❌ Wrong! Take a sip. 🍺';
+
+      // If correct, show pick-drinker view after a brief moment
+      if (correct && pickingDrinker && list) {
+        setTimeout(() => {
+          const others = list.filter(p => p.id !== myId && p.connected);
+          const btnContainer = document.getElementById('pd-player-btns');
+          btnContainer.innerHTML = others.map(p =>
+            `<button class="player-pick-btn" onclick="pickDrinker('${p.id}', '${escAttr(p.name)}')"
+              style="display:flex; justify-content:space-between; align-items:center;">
+              <span>${escHtml(p.name)}</span>
+              <span style="color:var(--color-neon-pink);">Send drink 🍺</span>
+            </button>`
+          ).join('');
+          document.getElementById('pd-result').classList.add('hidden');
+          showView('pick-drinker');
+        }, 1800);
+      }
+    }
+  });
+
+  // Buzzer events
+  socket.on('buzzer_round_player', ({ question }) => {
+    currentTriviaQuestion = question;
+
+    // Show watching view by default (unless I buzz in)
+    document.getElementById('tw-question').textContent = question.question;
+    document.getElementById('tw-winner').classList.add('hidden');
+    document.getElementById('tw-result').classList.add('hidden');
+
+    const twChoices = document.getElementById('tw-choices');
+    twChoices.innerHTML = question.choices.map(c =>
+      `<div class="choice-btn-phone" style="cursor:default;">${c}</div>`
+    ).join('');
+
+    // Switch to buzzer view
+    document.getElementById('bz-status').textContent = 'Waiting for host to open buzzer…';
+    document.getElementById('buzz-btn').disabled = true;
+    document.getElementById('bz-locked-msg').classList.add('hidden');
+    showView('buzzer');
+  });
+
+  socket.on('buzzer_open', () => {
+    document.getElementById('bz-status').textContent = '⚡ TAP TO BUZZ IN!';
+    document.getElementById('buzz-btn').disabled = false;
+  });
+
+  socket.on('buzzer_locked', ({ winnerId, winnerName }) => {
+    document.getElementById('buzz-btn').disabled = true;
+    document.getElementById('bz-status').textContent = '';
+
+    if (winnerId !== myId) {
+      // I didn't win — switch to watching view
+      document.getElementById('tw-winner').classList.remove('hidden');
+      document.getElementById('tw-winner').textContent = `⚡ ${winnerName} buzzed in!`;
+      showView('trivia-watching');
+    }
+  });
+
+  socket.on('you_buzzed_in', ({ question }) => {
+    document.getElementById('ta-question').textContent = question.question;
+    document.getElementById('ta-result').classList.add('hidden');
+    document.getElementById('ta-submit-btn').disabled = true;
+    myTriviaChoiceIndex = null;
+
+    const choices = document.getElementById('ta-choices');
+    choices.innerHTML = question.choices.map((c, i) =>
+      `<button class="choice-btn-phone" onclick="selectTriviaChoice(${i})">${c}</button>`
+    ).join('');
+
+    showView('trivia-answer');
+  });
+
+  socket.on('trivia_answer_result', ({ correct, correctIndex, playerName }) => {
+    // Update answer view if I was answering
+    const ta = document.getElementById('trivia-answer-view');
+    if (ta.classList.contains('active')) {
+      const btns = document.querySelectorAll('#ta-choices .choice-btn-phone');
+      btns.forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === correctIndex) btn.classList.add('correct');
+        else if (i === myTriviaChoiceIndex) btn.classList.add('wrong');
+      });
+      const res = document.getElementById('ta-result');
+      res.classList.remove('hidden');
+      res.style.color = correct ? '#1a9900' : 'var(--color-neon-pink)';
+      res.textContent = correct ? '✅ Correct! +3 points!' : '❌ Wrong! Take a sip 🍺';
+    }
+
+    // Update watching view
+    const tw = document.getElementById('trivia-watching-view');
+    if (tw.classList.contains('active')) {
+      const twChoices = document.querySelectorAll('#tw-choices .choice-btn-phone');
+      twChoices.forEach((btn, i) => {
+        if (i === correctIndex) btn.classList.add('correct');
+      });
+      const res = document.getElementById('tw-result');
+      res.classList.remove('hidden');
+      res.style.color = correct ? '#1a9900' : 'var(--color-neon-pink)';
+      res.textContent = correct
+        ? `✅ ${playerName} got it right!`
+        : `❌ ${playerName} was wrong — drink!`;
+    }
+  });
+
+  socket.on('game_over', ({ leaderboard }) => {
+    const me = leaderboard.find(p => p.name === myName);
+    document.getElementById('my-final-score').textContent = me ? me.score : 0;
+    document.getElementById('my-final-drinks').textContent = me ? me.drinks : 0;
+
+    const tbody = document.getElementById('results-tbody');
+    tbody.innerHTML = leaderboard.map(p => `
+      <tr>
+        <td>${p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : p.rank}</td>
+        <td><strong>${escHtml(p.name)}</strong>${p.name === myName ? ' <span style="color:var(--color-neon-blue);">(you)</span>' : ''}</td>
+        <td>${p.score}</td>
+        <td>🍺 ${p.drinks}</td>
+      </tr>`).join('');
+
+    showView('results');
+  });
+
+  socket.on('drink_received', ({ from }) => {
+    const popup = document.getElementById('beer-popup');
+    document.getElementById('beer-from-msg').textContent = `${from} sent you a drink!`;
+    popup.style.display = 'flex';
+  });
+
+  document.getElementById('beer-popup').addEventListener('click', () => {
+    document.getElementById('beer-popup').style.display = 'none';
+  });
+
+  socket.on('game_reset', () => {
+    joined = false;
+    myName = '';
+    myExpertise = '';
+    myExpertQuestions = [];
+    document.getElementById('name-input').value = '';
+    document.getElementById('expertise-input').value = '';
+    showView('join');
+    toast('Game reset! Join again 🎮');
+  });
+
+  socket.on('error_msg', (msg) => {
+    const errEl = document.getElementById('join-error');
+    errEl.textContent = typeof msg === 'string' ? msg : 'Something went wrong.';
+    errEl.style.display = 'block';
+  });
+
+  // ── Action functions ───────────────────────────────────────────────────────
+
+  let myExpertChoiceIndex = null;
+  function submitExpertAnswer(choiceIndex) {
+    myExpertChoiceIndex = choiceIndex;
+    const btns = document.querySelectorAll('#hm-choices .choice-btn-phone');
+    btns.forEach(b => b.disabled = true);
+    socket.emit('player_expert_answer', { choiceIndex });
+  }
+
+  function pickDrinker(targetId, targetName) {
+    const btns = document.querySelectorAll('#pd-player-btns .player-pick-btn');
+    btns.forEach(b => b.disabled = true);
+    socket.emit('pick_drinker', { targetId });
+
+    const res = document.getElementById('pd-result');
+    res.classList.remove('hidden');
+    res.textContent = `🍺 Sent a drink to ${targetName}!`;
+  }
+
+  document.getElementById('buzz-btn').addEventListener('click', () => {
+    document.getElementById('buzz-btn').disabled = true;
+    socket.emit('player_buzz');
+  });
+
+  let myTriviaChoiceIndex = null;
+  function selectTriviaChoice(choiceIndex) {
+    myTriviaChoiceIndex = choiceIndex;
+    const btns = document.querySelectorAll('#ta-choices .choice-btn-phone');
+    btns.forEach((b, i) => b.classList.toggle('selected', i === choiceIndex));
+    document.getElementById('ta-submit-btn').disabled = false;
+  }
+  function submitTriviaAnswer() {
+    if (myTriviaChoiceIndex === null) return;
+    const btns = document.querySelectorAll('#ta-choices .choice-btn-phone');
+    btns.forEach(b => b.disabled = true);
+    document.getElementById('ta-submit-btn').disabled = true;
+    socket.emit('player_trivia_answer', { choiceIndex: myTriviaChoiceIndex });
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escAttr(str) {
+    return String(str || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+  }
+</script>
+</body>
+</html>

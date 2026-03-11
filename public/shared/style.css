@@ -1,0 +1,272 @@
+/* ═══════════════════════════════════════════════════
+   DRINK UP! — Arcade Theme
+   Airy + light base, neon accents
+═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;600;700;900&display=swap');
+
+:root {
+  --color-bg:          #F8F9FF;
+  --color-card:        #FFFFFF;
+  --color-border:      #E2E8FF;
+  --color-text:        #1a1a2e;
+  --color-text-muted:  #6b7280;
+  --color-neon-pink:   #FF2D78;
+  --color-neon-blue:   #00D4FF;
+  --color-neon-green:  #39FF14;
+  --color-neon-yellow: #FFE500;
+  --color-neon-purple: #BF5FFF;
+  --font-arcade:       'Press Start 2P', monospace;
+  --font-body:         'Nunito', sans-serif;
+  --radius:            16px;
+  --radius-sm:         8px;
+  --shadow:            0 4px 24px rgba(0,0,0,0.08);
+  --shadow-neon-pink:  0 0 20px rgba(255,45,120,0.4);
+  --shadow-neon-blue:  0 0 20px rgba(0,212,255,0.4);
+  --shadow-neon-green: 0 0 20px rgba(57,255,20,0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Typography ── */
+.arcade-title {
+  font-family: var(--font-arcade);
+  font-size: clamp(1.2rem, 4vw, 2.5rem);
+  background: linear-gradient(135deg, var(--color-neon-pink), var(--color-neon-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.arcade-label {
+  font-family: var(--font-arcade);
+  font-size: clamp(0.5rem, 1.5vw, 0.75rem);
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-arcade);
+  font-size: clamp(0.55rem, 1.2vw, 0.75rem);
+  padding: 14px 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+  background: var(--color-neon-pink);
+  color: white;
+  box-shadow: var(--shadow-neon-pink);
+}
+.btn-primary:hover { box-shadow: 0 0 32px rgba(255,45,120,0.6); }
+
+.btn-blue {
+  background: var(--color-neon-blue);
+  color: var(--color-text);
+  box-shadow: var(--shadow-neon-blue);
+}
+.btn-blue:hover { box-shadow: 0 0 32px rgba(0,212,255,0.6); }
+
+.btn-green {
+  background: var(--color-neon-green);
+  color: var(--color-text);
+  box-shadow: var(--shadow-neon-green);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Answer Choices ── */
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.choice-btn {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(0.85rem, 1.8vw, 1rem);
+  padding: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.choice-btn:hover:not(:disabled) {
+  border-color: var(--color-neon-blue);
+  box-shadow: var(--shadow-neon-blue);
+}
+
+.choice-btn.correct {
+  background: var(--color-neon-green);
+  border-color: var(--color-neon-green);
+  box-shadow: var(--shadow-neon-green);
+}
+
+.choice-btn.wrong {
+  background: var(--color-neon-pink);
+  border-color: var(--color-neon-pink);
+  color: white;
+}
+
+.choice-btn:disabled { cursor: default; }
+
+/* ── Player chips ── */
+.player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  animation: pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.player-chip .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-neon-green);
+  box-shadow: 0 0 6px var(--color-neon-green);
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Neon badge ── */
+.neon-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-family: var(--font-arcade);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.badge-pink  { background: rgba(255,45,120,0.12); color: var(--color-neon-pink);  border: 1.5px solid var(--color-neon-pink); }
+.badge-blue  { background: rgba(0,212,255,0.12);  color: var(--color-neon-blue);  border: 1.5px solid var(--color-neon-blue); }
+.badge-green { background: rgba(57,255,20,0.12);  color: #1a9900;                 border: 1.5px solid var(--color-neon-green); }
+.badge-yellow{ background: rgba(255,229,0,0.15);  color: #a07a00;                 border: 1.5px solid var(--color-neon-yellow); }
+
+/* ── Utility ── */
+.text-center { text-align: center; }
+.mt-sm  { margin-top: 8px; }
+.mt-md  { margin-top: 16px; }
+.mt-lg  { margin-top: 24px; }
+.mt-xl  { margin-top: 40px; }
+.mb-sm  { margin-bottom: 8px; }
+.mb-md  { margin-bottom: 16px; }
+.mb-lg  { margin-bottom: 24px; }
+.gap-sm { gap: 8px; }
+.flex   { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.w-full { width: 100%; }
+.hidden { display: none !important; }
+
+/* ── Loading animation ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.blink { animation: blink 1s step-end infinite; }
+
+/* ── Pulse ring (buzzer) ── */
+@keyframes pulse-ring {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,45,120,0.7); }
+  70%  { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(255,45,120,0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,45,120,0); }
+}
+
+/* ── Leaderboard ── */
+.leaderboard {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.leaderboard th, .leaderboard td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.leaderboard th {
+  font-family: var(--font-arcade);
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.leaderboard tr:first-child td { font-weight: 900; }
+.leaderboard .rank-1 td:first-child { color: var(--color-neon-yellow); }
+.leaderboard .rank-2 td:first-child { color: var(--color-text-muted); }
+.leaderboard .rank-3 td:first-child { color: #c07a40; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
