@@ -276,6 +276,60 @@
 
     .score-drinks { color: var(--color-neon-pink); font-size: 0.8rem; }
 
+    /* ── Act transition ── */
+    #act-transition-view {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 24px;
+    }
+
+    .act-box {
+      border-radius: var(--radius);
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .act-box.act-2 {
+      background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.05));
+      border: 3px solid var(--color-neon-blue);
+      box-shadow: var(--shadow-neon-blue);
+    }
+
+    .act-box.act-3 {
+      background: linear-gradient(135deg, rgba(255,45,120,0.12), rgba(255,45,120,0.05));
+      border: 3px solid var(--color-neon-pink);
+      box-shadow: var(--shadow-neon-pink);
+    }
+
+    .act-number {
+      font-family: var(--font-arcade);
+      font-size: clamp(2rem, 5vw, 4rem);
+      line-height: 1.2;
+    }
+
+    .act-number.act-2 { color: var(--color-neon-blue); }
+    .act-number.act-3 { color: var(--color-neon-pink); text-shadow: 0 0 30px rgba(255,45,120,0.6); }
+
+    .act-multiplier {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    /* ── Buzzer timer ── */
+    .bz-timer {
+      font-family: var(--font-arcade);
+      font-size: 3rem;
+      color: var(--color-neon-blue);
+      transition: color 0.3s;
+      min-width: 80px;
+      text-align: center;
+    }
+    .bz-timer.urgent { color: var(--color-neon-pink); text-shadow: 0 0 16px rgba(255,45,120,0.5); }
+
     /* ── Keyboard hint ── */
     .key-hint {
       position: fixed;
@@ -340,6 +394,16 @@
     </div>
   </div>
 
+  <!-- ── ACT TRANSITION ────────────────────────────────── -->
+  <div id="act-transition-view" class="view">
+    <div class="act-box" id="at-box">
+      <div class="arcade-label badge-pink neon-badge" id="at-badge">ACT II</div>
+      <div class="act-number" id="at-number"></div>
+      <div class="act-multiplier" id="at-multiplier"></div>
+      <div style="color:var(--color-text-muted); font-weight:600;">Stakes are rising — next round starts soon…</div>
+    </div>
+  </div>
+
   <!-- ── GENERATING ────────────────────────────────────── -->
   <div id="generating-view" class="view">
     <div class="dots-row">
@@ -396,6 +460,7 @@
     <div class="buzzer-top">
       <span class="neon-badge badge-blue">⚡ BUZZER ROUND</span>
       <span id="bz-category" class="arcade-label"></span>
+      <div id="bz-timer" class="bz-timer hidden">30</div>
       <button class="btn btn-blue" id="open-buzzer-btn">OPEN BUZZER</button>
     </div>
 
@@ -429,6 +494,17 @@
   </div>
 </div>
 
+<!-- ── Lucky drink banner ── -->
+<div id="lucky-drink-banner" class="hidden" style="
+  position:fixed; top:32px; left:50%; transform:translateX(-50%);
+  background:rgba(255,45,120,0.95); color:white;
+  font-family:var(--font-arcade); font-size:clamp(0.6rem,1.8vw,1rem);
+  padding:20px 40px; border-radius:var(--radius);
+  box-shadow:var(--shadow-neon-pink); z-index:500;
+  animation:pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  text-align:center; line-height:1.6;
+"></div>
+
 <!-- ── Live scoreboard sidebar ── -->
 <div class="scoreboard" id="scoreboard" style="display:none"></div>
 
@@ -448,6 +524,7 @@
   let players = {};
   let currentRound = {};
   let hotSeatCalloutTimeout = null;
+  let timerInterval = null;
 
   // ── View switching ───────────────────────────────────────────────────────
   function showView(name) {
@@ -457,7 +534,7 @@
     if (el) el.classList.add('active');
 
     // Show scoreboard during gameplay
-    const gameViews = ['hotseat-callout','hotseat-question','pick-drinker','buzzer'];
+    const gameViews = ['hotseat-callout','hotseat-question','pick-drinker','buzzer','act-transition'];
     document.getElementById('scoreboard').style.display =
       gameViews.includes(name) ? 'flex' : 'none';
   }
@@ -532,9 +609,21 @@
     // Views handled by hot_seat_round / buzzer_round events
   });
 
+  socket.on('act_transition', ({ act, drinkMultiplier }) => {
+    const actLabels = ['', 'ACT I', 'ACT II', 'ACT III'];
+    const actClass = `act-${act}`;
+    const box = document.getElementById('at-box');
+    box.className = `act-box ${actClass}`;
+    document.getElementById('at-badge').textContent = actLabels[act];
+    document.getElementById('at-number').className = `act-number ${actClass}`;
+    document.getElementById('at-number').textContent = actLabels[act];
+    document.getElementById('at-multiplier').textContent = `🍺 Drinks are now ${drinkMultiplier}x`;
+    showView('act-transition');
+  });
+
   // Hot seat callout (3-second dramatic hold)
-  socket.on('hot_seat_round', ({ hotSeatPlayerName, hotSeatExpertise, hotSeatPlayerId, question }) => {
-    document.getElementById('round-badge').textContent = '';
+  socket.on('hot_seat_round', ({ hotSeatPlayerName, hotSeatExpertise, hotSeatPlayerId, question, act, drinkMultiplier }) => {
+    document.getElementById('round-badge').textContent = act > 1 ? `ACT ${['','I','II','III'][act]} · ${drinkMultiplier}x drinks` : '';
     currentRound = { type: 'hot_seat', hotSeatPlayerId, hotSeatPlayerName, hotSeatExpertise, question };
 
     document.getElementById('callout-name').textContent = hotSeatPlayerName.toUpperCase();
@@ -597,6 +686,14 @@
     }
   });
 
+  socket.on('lucky_drink_announced', ({ name, players: list }) => {
+    renderPlayers(list);
+    const banner = document.getElementById('lucky-drink-banner');
+    banner.textContent = `🍀 Bad luck, ${escHtml(name)}! SWIG! 🍺`;
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 4000);
+  });
+
   socket.on('drinker_picked', ({ pickerName, targetName, players: list }) => {
     renderPlayers(list);
     const res = document.getElementById('pd-result');
@@ -606,7 +703,13 @@
     </div>`;
   });
 
-  socket.on('buzzer_round', ({ question }) => {
+  socket.on('buzzer_round', ({ question, act, drinkMultiplier }) => {
+    document.getElementById('round-badge').textContent = act > 1 ? `ACT ${['','I','II','III'][act]} · ${drinkMultiplier}x drinks` : '';
+    clearInterval(timerInterval);
+    const timerEl = document.getElementById('bz-timer');
+    timerEl.classList.add('hidden');
+    timerEl.classList.remove('urgent');
+
     currentRound = { type: 'buzzer', question };
     document.getElementById('bz-question-text').textContent = question.question;
     document.getElementById('bz-category').textContent = question.category || '';
@@ -628,12 +731,27 @@
     document.getElementById('open-buzzer-btn').textContent = '⚡ BUZZER OPEN';
   });
 
-  socket.on('buzzer_locked', ({ winnerName }) => {
+  socket.on('buzzer_locked', ({ winnerName, endsAt }) => {
     document.getElementById('bz-winner-area').innerHTML =
       `<div class="buzzer-winner-banner">⚡ ${escHtml(winnerName)} BUZZED IN!</div>`;
+
+    const timerEl = document.getElementById('bz-timer');
+    timerEl.classList.remove('hidden');
+    timerEl.classList.remove('urgent');
+    timerEl.textContent = '30';
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      const remaining = Math.ceil((endsAt - Date.now()) / 1000);
+      timerEl.textContent = Math.max(0, remaining);
+      if (remaining <= 5) timerEl.classList.add('urgent');
+      if (remaining <= 0) clearInterval(timerInterval);
+    }, 100);
   });
 
-  socket.on('trivia_answer_result', ({ correct, correctIndex, chosenIndex, playerName, players: list }) => {
+  socket.on('trivia_answer_result', ({ correct, correctIndex, chosenIndex, playerName, timedOut, players: list }) => {
+    clearInterval(timerInterval);
+    document.getElementById('bz-timer').classList.add('hidden');
     renderPlayers(list);
 
     const btns = document.querySelectorAll('#bz-choices .choice-btn');
@@ -646,7 +764,9 @@
     resultEl.classList.remove('hidden');
     resultEl.innerHTML = correct
       ? `<div class="result-banner result-correct">✅ ${escHtml(playerName)} is RIGHT! +3 points</div>`
-      : `<div class="result-banner result-wrong">❌ ${escHtml(playerName)} is WRONG — SWIG 🍺</div>`;
+      : timedOut
+        ? `<div class="result-banner result-wrong">⏱ ${escHtml(playerName)} RAN OUT OF TIME — SWIG 🍺</div>`
+        : `<div class="result-banner result-wrong">❌ ${escHtml(playerName)} is WRONG — SWIG 🍺</div>`;
   });
 
   socket.on('game_over', ({ leaderboard }) => {
@@ -675,6 +795,7 @@
   socket.on('game_reset', () => {
     players = {};
     renderPlayers([]);
+    document.getElementById('round-badge').textContent = '';
     showView('lobby');
     loadQR();
   });

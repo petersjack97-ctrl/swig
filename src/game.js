@@ -15,7 +15,12 @@ function createInitialState() {
     roundHistory: [],
     consecutiveBuzzerRounds: 0,   // force hot seat after 3 consecutive buzzer rounds
     hotSeatQueue: [],             // players who haven't had a hot seat yet
-    roundNumber: 0
+    roundNumber: 0,
+    act: 1,                       // current act (1 | 2 | 3)
+    drinkMultiplier: 1,           // 1x | 2x | 3x
+    actBoundaries: [],            // [endOfAct1, endOfAct2, total]
+    actJustChanged: false,        // flag consumed by socket-handlers to emit transition
+    luckyDrinkRounds: new Set()  // round numbers after which a lucky drink fires
   };
 }
 
@@ -35,6 +40,8 @@ function createEmptyRound() {
     buzzedPlayerId: null,
     buzzedPlayerName: null,
     answerSubmitted: false,
+    timedOut: false,
+    buzzerEndsAt: null,
   };
 }
 
@@ -60,7 +67,9 @@ function getPublicState() {
     phase: state.phase,
     players,
     currentRound: { ...state.currentRound, question: null },
-    roundNumber: state.roundNumber
+    roundNumber: state.roundNumber,
+    act: state.act,
+    drinkMultiplier: state.drinkMultiplier
   };
 }
 
@@ -112,10 +121,66 @@ function loadQuestions(expertQuestions, triviaQuestions) {
     state.questionPool.expert[sid] = questions.map(q => ({ ...q, used: false }));
   }
 
+  const totalTrivia = state.questionPool.trivia.length;
+  const totalExpert = Object.values(state.questionPool.expert)
+    .reduce((sum, pool) => sum + pool.length, 0);
+  state.actBoundaries = computeActBoundaries(totalTrivia + totalExpert);
+  state.luckyDrinkRounds = computeLuckyDrinkRounds(state.actBoundaries);
+
   state.hotSeatQueue = Object.keys(state.players).filter(id => state.players[id].connected);
   shuffle(state.hotSeatQueue);
 
   state.phase = 'playing';
+}
+
+function computeActBoundaries(totalRounds) {
+  const base = Math.floor(totalRounds / 3);
+  const rem = totalRounds % 3;
+  const end1 = base + (rem > 0 ? 1 : 0);
+  const end2 = end1 + base + (rem > 1 ? 1 : 0);
+  return [end1, end2, totalRounds];
+}
+
+function computeLuckyDrinkRounds(actBoundaries) {
+  const [end1, end2, total] = actBoundaries;
+  const acts = [
+    { start: 1, end: end1 },
+    { start: end1 + 1, end: end2 },
+    { start: end2 + 1, end: total }
+  ];
+  const rounds = new Set();
+  for (const { start, end } of acts) {
+    if (start <= end) {
+      rounds.add(start + Math.floor(Math.random() * (end - start + 1)));
+    }
+  }
+  return rounds;
+}
+
+function shouldFireLuckyDrink() {
+  return state.luckyDrinkRounds.has(state.roundNumber);
+}
+
+function pickRandomDrinker() {
+  const connected = getConnectedPlayers();
+  if (connected.length === 0) return null;
+  const player = connected[Math.floor(Math.random() * connected.length)];
+  player.drinks += state.drinkMultiplier;
+  return { id: player.id, name: player.name };
+}
+
+function checkAndAdvanceAct() {
+  if (state.actBoundaries.length === 0) return;
+  const rn = state.roundNumber;
+  if (state.act === 1 && rn > state.actBoundaries[0]) {
+    state.act = 2;
+    state.drinkMultiplier = 2;
+    state.actJustChanged = true;
+  } else if (state.act === 2 && rn > state.actBoundaries[1]) {
+    state.act = 3;
+    state.drinkMultiplier = 3;
+    state.actJustChanged = true;
+  }
 }
 
 // ─── Round logic ─────────────────────────────────────────────────────────────
@@ -182,6 +247,7 @@ function startHotSeatRound() {
 
   state.consecutiveBuzzerRounds = 0;
   state.roundNumber++;
+  checkAndAdvanceAct();
   state.currentRound = {
     ...createEmptyRound(),
     type: 'hot_seat',
@@ -210,6 +276,7 @@ function startBuzzerRound() {
 
   state.consecutiveBuzzerRounds++;
   state.roundNumber++;
+  checkAndAdvanceAct();
   state.currentRound = {
     ...createEmptyRound(),
     type: 'buzzer',
@@ -234,7 +301,7 @@ function submitHotSeatAnswer(choiceIndex) {
     player.score += 2;
     round.pickingDrinker = true;
   } else {
-    player.drinks += 1;
+    player.drinks += state.drinkMultiplier;
   }
 
   logRound({
@@ -242,15 +309,40 @@ function submitHotSeatAnswer(choiceIndex) {
     playerName: player.name,
     question: round.question.question,
     correct,
-    drinksDelta: correct ? 0 : 1
+    drinksDelta: correct ? 0 : state.drinkMultiplier
   });
 
   return { correct, pickingDrinker: correct };
 }
 
-function openBuzzer() {
+function openBuzzer(endsAt) {
   if (state.currentRound.type !== 'buzzer') return false;
   state.currentRound.buzzerOpen = true;
+  state.currentRound.buzzerEndsAt = endsAt || null;
+  return true;
+}
+
+function setAnswerTimedOut() {
+  const round = state.currentRound;
+  if (round.type !== 'buzzer' || !round.buzzedPlayerId || round.answerSubmitted) return false;
+  round.answerSubmitted = true;
+  const player = state.players[round.buzzedPlayerId];
+  if (player) player.drinks += state.drinkMultiplier;
+  logRound({
+    type: 'buzzer',
+    playerName: player?.name || '',
+    question: round.question.question,
+    correct: false,
+    drinksDelta: state.drinkMultiplier
+  });
+  return { playerName: player?.name, correctIndex: round.question.correctIndex };
+}
+
+function setBuzzerTimedOut() {
+  const round = state.currentRound;
+  if (round.type !== 'buzzer' || !round.buzzerOpen) return false;
+  round.buzzerOpen = false;
+  round.timedOut = true;
   return true;
 }
 
@@ -278,7 +370,7 @@ function submitTriviaAnswer(choiceIndex) {
   if (correct) {
     player.score += 3;
   } else {
-    player.drinks += 1;
+    player.drinks += state.drinkMultiplier;
   }
 
   logRound({
@@ -299,7 +391,7 @@ function assignDrink(pickerSocketId, targetSocketId) {
   const target = state.players[targetSocketId];
   if (!target) return false;
 
-  target.drinks += 1;
+  target.drinks += state.drinkMultiplier;
   round.pickingDrinker = false;
   return { targetName: target.name };
 }
@@ -356,6 +448,10 @@ module.exports = {
   startBuzzerRound,
   submitHotSeatAnswer,
   openBuzzer,
+  setBuzzerTimedOut,
+  setAnswerTimedOut,
+  shouldFireLuckyDrink,
+  pickRandomDrinker,
   buzz,
   submitTriviaAnswer,
   assignDrink,

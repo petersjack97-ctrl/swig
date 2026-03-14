@@ -6,6 +6,8 @@ const { generateExpertQuestions, generateTriviaQuestions } = require('./ai');
 const EXPERT_QUESTIONS_PER_PLAYER = 1;
 const TRIVIA_QUESTIONS_COUNT = 10;
 
+let buzzerTimer = null;
+
 function setupSocketHandlers(io) {
 
   io.on('connection', (socket) => {
@@ -107,6 +109,8 @@ function setupSocketHandlers(io) {
         pickingDrinker: result.pickingDrinker,
         players: getPlayerList()
       });
+
+      maybeTriggerLuckyDrink(io);
     });
 
     // ── Hot seat: pick who drinks ─────────────────────────────────────────
@@ -127,7 +131,7 @@ function setupSocketHandlers(io) {
     // ── Host opens buzzer ─────────────────────────────────────────────────
     socket.on('host_open_buzzer', () => {
       if (!game.isHost(socket.id)) return;
-      const opened = game.openBuzzer();
+      const opened = game.openBuzzer(null);
       if (opened) {
         io.emit('buzzer_open', { message: 'BUZZ IN!' });
       }
@@ -137,14 +141,33 @@ function setupSocketHandlers(io) {
     socket.on('player_buzz', () => {
       const won = game.buzz(socket.id);
       if (won) {
+        const endsAt = Date.now() + 30000;
         const round = game.getState().currentRound;
         io.emit('buzzer_locked', {
           winnerId: socket.id,
-          winnerName: round.buzzedPlayerName
+          winnerName: round.buzzedPlayerName,
+          endsAt
         });
         io.to(socket.id).emit('you_buzzed_in', {
-          question: round.question
+          question: round.question,
+          endsAt
         });
+
+        buzzerTimer = setTimeout(() => {
+          const result = game.setAnswerTimedOut();
+          if (result) {
+            io.emit('trivia_answer_result', {
+              correct: false,
+              correctIndex: result.correctIndex,
+              chosenIndex: null,
+              correctAnswer: round.question.choices[result.correctIndex],
+              playerName: result.playerName,
+              timedOut: true,
+              players: getPlayerList()
+            });
+            maybeTriggerLuckyDrink(io);
+          }
+        }, 30000);
       }
     });
 
@@ -156,6 +179,8 @@ function setupSocketHandlers(io) {
       const result = game.submitTriviaAnswer(choiceIndex);
       if (!result) return;
 
+      if (buzzerTimer) { clearTimeout(buzzerTimer); buzzerTimer = null; }
+
       io.emit('trivia_answer_result', {
         correct: result.correct,
         correctIndex: result.correctIndex,
@@ -164,6 +189,8 @@ function setupSocketHandlers(io) {
         playerName: state.currentRound.buzzedPlayerName,
         players: getPlayerList()
       });
+
+      maybeTriggerLuckyDrink(io);
     });
 
     // ── Host advances to next round ────────────────────────────────────────
@@ -171,6 +198,7 @@ function setupSocketHandlers(io) {
       if (!game.isHost(socket.id)) return;
       const state = game.getState();
       if (state.phase !== 'playing') return;
+      if (buzzerTimer) { clearTimeout(buzzerTimer); buzzerTimer = null; }
       startNextRound(io);
     });
 
@@ -220,23 +248,38 @@ function startNextRound(io) {
   if (type === 'hot_seat') {
     round = game.startHotSeatRound();
     if (round.type === 'buzzer') {
-      emitBuzzerRound(io, round);
+      maybeEmitActTransition(io, () => emitBuzzerRound(io, round));
       return;
     }
-    emitHotSeatRound(io, round);
+    maybeEmitActTransition(io, () => emitHotSeatRound(io, round));
   } else {
     round = game.startBuzzerRound();
-    emitBuzzerRound(io, round);
+    maybeEmitActTransition(io, () => emitBuzzerRound(io, round));
+  }
+}
+
+function maybeEmitActTransition(io, emitFn) {
+  const state = game.getState();
+  if (state.actJustChanged) {
+    const { act, drinkMultiplier } = state;
+    state.actJustChanged = false;
+    io.emit('act_transition', { act, drinkMultiplier });
+    setTimeout(emitFn, 4000);
+  } else {
+    emitFn();
   }
 }
 
 function emitHotSeatRound(io, round) {
+  const { act, drinkMultiplier } = game.getState();
   io.to('host').emit('hot_seat_round', {
     roundType: 'hot_seat',
     hotSeatPlayerId: round.hotSeatPlayerId,
     hotSeatPlayerName: round.hotSeatPlayerName,
     hotSeatExpertise: round.hotSeatExpertise,
-    question: sanitizeQuestion(round.question)
+    question: sanitizeQuestion(round.question),
+    act,
+    drinkMultiplier
   });
 
   io.to(round.hotSeatPlayerId).emit('your_turn_hot_seat', {
@@ -250,13 +293,18 @@ function emitHotSeatRound(io, round) {
 }
 
 function emitBuzzerRound(io, round) {
+  const { act, drinkMultiplier } = game.getState();
   io.to('host').emit('buzzer_round', {
     roundType: 'buzzer',
-    question: sanitizeQuestion(round.question)
+    question: sanitizeQuestion(round.question),
+    act,
+    drinkMultiplier
   });
 
   io.to('players').emit('buzzer_round_player', {
-    question: sanitizeQuestion(round.question)
+    question: sanitizeQuestion(round.question),
+    act,
+    drinkMultiplier
   });
 }
 
@@ -281,6 +329,16 @@ function getPlayerList() {
 
 function broadcastPlayerList(io) {
   io.emit('player_list_update', { players: getPlayerList() });
+}
+
+function maybeTriggerLuckyDrink(io) {
+  if (!game.shouldFireLuckyDrink()) return;
+  setTimeout(() => {
+    const drinker = game.pickRandomDrinker();
+    if (!drinker) return;
+    io.to(drinker.id).emit('lucky_drink', { name: drinker.name });
+    io.emit('lucky_drink_announced', { name: drinker.name, players: getPlayerList() });
+  }, 1500);
 }
 
 module.exports = { setupSocketHandlers };
