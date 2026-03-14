@@ -48,7 +48,7 @@ Rules:
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const raw = response.content[0].text.trim();
+    const raw = response.content[0].text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     const result = JSON.parse(raw);
 
     // Validate structure
@@ -98,7 +98,7 @@ Rules:
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const raw = response.content[0].text.trim();
+    const raw = response.content[0].text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     const result = JSON.parse(raw);
     if (!Array.isArray(result) || result.length < count) {
       throw new Error('Invalid trivia response shape');

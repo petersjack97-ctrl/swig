@@ -91,3 +91,10 @@ TRIVIA_QUESTIONS_COUNT = 10
 - Trivia buzzer correct: +3pts
 - Wrong answer (either type): +1 drink, 0pts
 - Pick who drinks: target gets +1 drink
+
+## Repo notes
+- `drink_game/` has its own `.git` and is independent of any parent repo on this machine. Commit and push from inside `~/Desktop/DEV/drink_game/`, not from a parent directory.
+- GitHub: https://github.com/petersjack97-ctrl/swig
+
+## Network requirement
+- The QR code points to the host machine's LAN IP. Players must be on the **same WiFi network** as the host for it to work. The game will not work over the internet or across different networks.

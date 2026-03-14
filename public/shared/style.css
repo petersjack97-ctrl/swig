@@ -156,6 +156,7 @@ body {
 .choice-btn.wrong {
   background: var(--color-neon-pink);
   border-color: var(--color-neon-pink);
+  box-shadow: var(--shadow-neon-pink);
   color: white;
 }
 

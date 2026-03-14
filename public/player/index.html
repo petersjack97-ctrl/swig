@@ -182,6 +182,7 @@
     .choice-btn-phone.wrong {
       background: var(--color-neon-pink);
       border-color: var(--color-neon-pink);
+      box-shadow: var(--shadow-neon-pink);
       color: white;
     }
 
@@ -474,6 +475,7 @@
     <div class="answering-header">
       ⚡ YOU BUZZED IN!<br>ANSWER FAST!
     </div>
+    <div id="ta-timer" class="hidden" style="font-family:var(--font-arcade); font-size:2rem; text-align:center; color:var(--color-neon-blue); transition:color 0.3s;"></div>
     <div class="question-card" id="ta-question"></div>
     <div class="choices-phone" id="ta-choices"></div>
     <button id="ta-submit-btn" class="btn btn-primary w-full" onclick="submitTriviaAnswer()" disabled style="margin-top:8px; padding:18px; font-size:0.75rem;">SUBMIT ANSWER</button>
@@ -483,9 +485,10 @@
   <!-- ── TRIVIA — WATCHING ──────────────────────────────── -->
   <div id="trivia-watching-view" class="view">
     <div class="neon-badge badge-blue" style="align-self:center;">⚡ BUZZER ROUND</div>
+    <div id="tw-winner" class="hidden" style="text-align:center; font-weight:700; color:var(--color-neon-pink); padding:12px; font-family:var(--font-arcade); font-size:0.65rem;"></div>
+    <div id="tw-timer" class="hidden" style="font-family:var(--font-arcade); font-size:2rem; text-align:center; color:var(--color-neon-blue); transition:color 0.3s;"></div>
     <div class="question-card" id="tw-question"></div>
     <div class="choices-phone" id="tw-choices" style="opacity:0.5; pointer-events:none;"></div>
-    <div id="tw-winner" class="hidden" style="text-align:center; font-weight:700; color:var(--color-neon-pink); padding:12px; font-family:var(--font-arcade); font-size:0.65rem;"></div>
     <div id="tw-result" class="hidden" style="text-align:center; font-weight:700; padding:16px; font-size:1rem;"></div>
   </div>
 
@@ -511,6 +514,22 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- Act transition overlay -->
+<div id="act-overlay" style="
+  display:none;
+  position:fixed; inset:0; z-index:900;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:16px;
+  text-align:center;
+  animation:fadeIn 0.2s ease;
+">
+  <div id="ao-act" style="font-family:var(--font-arcade); font-size:1.8rem; line-height:1.4;"></div>
+  <div id="ao-multiplier" style="font-size:1.1rem; font-weight:700;"></div>
+  <div style="font-size:0.85rem; font-weight:600; opacity:0.8;">Stakes are rising!</div>
+</div>
 
 <!-- Beer popup overlay -->
 <div id="beer-popup" style="
@@ -548,6 +567,7 @@
   let joined = false;
   let currentTriviaQuestion = null;
   let myExpertQuestions = [];
+  let playerTimerInterval = null;
 
   // ── View ──────────────────────────────────────────────────────────────────
   function showView(name) {
@@ -616,6 +636,21 @@
     }
   });
 
+  socket.on('act_transition', ({ act, drinkMultiplier }) => {
+    const actLabels = ['', 'ACT I', 'ACT II', 'ACT III'];
+    const colors = ['', '', 'var(--color-neon-blue)', 'var(--color-neon-pink)'];
+    const overlay = document.getElementById('act-overlay');
+    overlay.style.background = act === 3
+      ? 'rgba(255,45,120,0.92)'
+      : 'rgba(0,212,255,0.88)';
+    document.getElementById('ao-act').style.color = 'white';
+    document.getElementById('ao-act').textContent = actLabels[act];
+    document.getElementById('ao-multiplier').style.color = 'rgba(255,255,255,0.9)';
+    document.getElementById('ao-multiplier').textContent = `🍺 Drinks are now ${drinkMultiplier}x`;
+    overlay.style.display = 'flex';
+    setTimeout(() => { overlay.style.display = 'none'; }, 4000);
+  });
+
   socket.on('game_generating', () => {
     if (joined) showView('generating');
   });
@@ -654,6 +689,7 @@
       const btns = document.querySelectorAll('#hm-choices .choice-btn-phone');
       btns.forEach((btn, i) => {
         btn.disabled = true;
+        btn.classList.remove('selected');
         if (i === correctIndex) btn.classList.add('correct');
         else if (i === myExpertChoiceIndex) btn.classList.add('wrong');
       });
@@ -683,9 +719,16 @@
 
   // Buzzer events
   socket.on('buzzer_round_player', ({ question }) => {
+    clearInterval(playerTimerInterval);
+    ['tw-timer', 'ta-timer'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.style.color = 'var(--color-neon-blue)';
+    });
+
     currentTriviaQuestion = question;
 
-    // Show watching view by default (unless I buzz in)
+    // Pre-populate watching view
     document.getElementById('tw-question').textContent = question.question;
     document.getElementById('tw-winner').classList.add('hidden');
     document.getElementById('tw-result').classList.add('hidden');
@@ -707,19 +750,32 @@
     document.getElementById('buzz-btn').disabled = false;
   });
 
-  socket.on('buzzer_locked', ({ winnerId, winnerName }) => {
+  socket.on('buzzer_locked', ({ winnerId, winnerName, endsAt }) => {
     document.getElementById('buzz-btn').disabled = true;
     document.getElementById('bz-status').textContent = '';
 
     if (winnerId !== myId) {
-      // I didn't win — switch to watching view
+      // I didn't win — switch to watching view and start countdown
       document.getElementById('tw-winner').classList.remove('hidden');
       document.getElementById('tw-winner').textContent = `⚡ ${winnerName} buzzed in!`;
       showView('trivia-watching');
+
+      const timerEl = document.getElementById('tw-timer');
+      timerEl.classList.remove('hidden');
+      timerEl.style.color = 'var(--color-neon-blue)';
+      timerEl.textContent = '30s';
+
+      clearInterval(playerTimerInterval);
+      playerTimerInterval = setInterval(() => {
+        const remaining = Math.ceil((endsAt - Date.now()) / 1000);
+        timerEl.textContent = Math.max(0, remaining) + 's';
+        if (remaining <= 5) timerEl.style.color = 'var(--color-neon-pink)';
+        if (remaining <= 0) clearInterval(playerTimerInterval);
+      }, 100);
     }
   });
 
-  socket.on('you_buzzed_in', ({ question }) => {
+  socket.on('you_buzzed_in', ({ question, endsAt }) => {
     document.getElementById('ta-question').textContent = question.question;
     document.getElementById('ta-result').classList.add('hidden');
     document.getElementById('ta-submit-btn').disabled = true;
@@ -731,15 +787,32 @@
     ).join('');
 
     showView('trivia-answer');
+
+    const timerEl = document.getElementById('ta-timer');
+    timerEl.classList.remove('hidden');
+    timerEl.style.color = 'var(--color-neon-blue)';
+    timerEl.textContent = '30s';
+
+    clearInterval(playerTimerInterval);
+    playerTimerInterval = setInterval(() => {
+      const remaining = Math.ceil((endsAt - Date.now()) / 1000);
+      timerEl.textContent = Math.max(0, remaining) + 's';
+      if (remaining <= 5) timerEl.style.color = 'var(--color-neon-pink)';
+      if (remaining <= 0) clearInterval(playerTimerInterval);
+    }, 100);
   });
 
   socket.on('trivia_answer_result', ({ correct, correctIndex, playerName }) => {
+    clearInterval(playerTimerInterval);
+    ['tw-timer', 'ta-timer'].forEach(id => document.getElementById(id).classList.add('hidden'));
+
     // Update answer view if I was answering
     const ta = document.getElementById('trivia-answer-view');
     if (ta.classList.contains('active')) {
       const btns = document.querySelectorAll('#ta-choices .choice-btn-phone');
       btns.forEach((btn, i) => {
         btn.disabled = true;
+        btn.classList.remove('selected');
         if (i === correctIndex) btn.classList.add('correct');
         else if (i === myTriviaChoiceIndex) btn.classList.add('wrong');
       });
@@ -785,6 +858,12 @@
   socket.on('drink_received', ({ from }) => {
     const popup = document.getElementById('beer-popup');
     document.getElementById('beer-from-msg').textContent = `${from} sent you a drink!`;
+    popup.style.display = 'flex';
+  });
+
+  socket.on('lucky_drink', () => {
+    const popup = document.getElementById('beer-popup');
+    document.getElementById('beer-from-msg').textContent = 'Your luck is shit! Swig!';
     popup.style.display = 'flex';
   });
 
